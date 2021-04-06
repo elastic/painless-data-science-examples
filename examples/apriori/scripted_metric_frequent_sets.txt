@@ -1,0 +1,103 @@
+{
+  "size": 0,
+  "query": {
+    "function_score": {
+      "random_score": {}
+    }
+  },
+  "aggs": {
+    "random_sample": {
+      "sampler": {
+        "shard_size": 2000
+      },
+      "aggs": {
+        "frequent_sets": {
+          "scripted_metric": {
+            "params": {
+                "fields": ["f1", "f2", "f3", "f4", "f5", "f6"],
+                "min_support": 0.1,
+                "max_set_size": 4
+            },
+            "init_script": "state.uniques = new HashMap()",
+            "map_script": """
+              def key = [];
+              for (field in params["fields"]) {
+                if (doc[field].size() > 0) {
+                    key.add(doc[field].getValue());
+                }
+              }
+              Collections.sort(key);
+              def flatKey = new StringJoiner(" ");
+              for (item in key) {
+                flatKey.add(item);
+              }
+              int count = state.uniques.getOrDefault(flatKey.toString(), 0);
+              state.uniques.put(flatKey.toString(), count + 1);
+            """,
+            "combine_script": "return state",
+            "reduce_script": """
+              def reducedUniques = new HashMap();
+              for (state in states) {
+                for (items in state.uniques.entrySet()) {
+                  int count = reducedUniques.getOrDefault(items.getKey(), 0);
+                  def itemSet = new HashSet();
+                  def tokenizer = new StringTokenizer(items.getKey(), " ");
+                  while (tokenizer.hasMoreElements()) {
+                    itemSet.add(tokenizer.nextToken());
+                  }
+                  reducedUniques.put(items.getKey(), [itemSet, count + items.getValue()]);
+                }
+              }
+              def uniqueItems = new HashMap();
+              int totalCount = 0;
+              for (unique in reducedUniques.entrySet()) {
+                def items = Collections.list(new StringTokenizer(unique.getKey(), " "));
+                for (item in items) {
+                  int count = uniqueItems.getOrDefault(item, 0);
+                  uniqueItems.put(item, count + unique.getValue()[1]);
+                }
+                totalCount = totalCount + unique.getValue()[1];
+              }
+              def frequentSets = [new HashMap()];
+              for (item in uniqueItems.entrySet()) {
+                if (item.getValue() > params["min_support"] * totalCount) {
+                  frequentSets[0].put(item.getKey(), ((double)item.getValue()) / totalCount);
+                }
+              }
+              for (int k = 0; k < params["max_set_size"]; k++) {
+                def frequentSetsK = new HashMap();
+                for (rule in frequentSets[k].entrySet()) {
+                  def tokenizer = new StringTokenizer(rule.getKey(), " ");
+                  def frequentSetItems = Collections.list(tokenizer);
+                  for (item in uniqueItems.entrySet()) {
+                    if (frequentSetItems.contains(item.getKey())) {
+                      continue;
+                    }
+                    def extenedFrequentSetItems = new ArrayList(frequentSetItems);
+                    extenedFrequentSetItems.add(item.getKey());
+                    Collections.sort(extenedFrequentSetItems);
+                    int support = 0;
+                    for (unique in reducedUniques.entrySet()) {
+                      if (unique.getValue()[0].containsAll(extenedFrequentSetItems)) {
+                        support = support + unique.getValue()[1];
+                      }
+                    }
+                    if (support > params["min_support"] * totalCount) {
+                      def flatExtendedRule = new StringJoiner(" ");
+                      for (ruleItem in extenedFrequentSetItems) {
+                        flatExtendedRule.add(ruleItem);
+                      }
+                      frequentSetsK.put(flatExtendedRule.toString(), ((double)support) / totalCount);
+                    }
+                  }
+                }
+                frequentSets.add(frequentSetsK);
+              }
+              return frequentSets;
+            """
+          }
+        }
+      }
+    }
+  }
+}
