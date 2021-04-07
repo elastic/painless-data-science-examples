@@ -27,3 +27,29 @@ where 'my_user' and 'my_password' are the user name and password for the Elastic
 >>> import examples.apriori.demo as demo
 >>> demo.run(user_name='my_user', password='my_password')
 ```
+For the apriori example you should see output like:
+```
+FREQUENT ITEM SETS DEMO...
+FREQUENT_SETS(size=1)
+   DIAMETER_PEER_GROUP_DOWN / support = 0.163
+   DIAMETER_PEER_GROUP_DOWN_RX / support = 0.1385
+   NO_PEER_GROUP_MEMBER_AVAILABLE / support = 0.309
+   DIAMETER_PEER_GROUP_UP_TX / support = 0.1535
+   PAD-Failure / support = 0.175
+   NO_PROCESS_STATE / support = 0.1385
+   NO_RESPONSE / support = 0.3305
+   DIAMETER_PEER_GROUP_UP_RX / support = 0.145
+   IP_REACHABLE / support = 0.5105
+   RELAY_LINK_STATUS / support = 0.3675
+   POM-Failure / support = 0.1765
+   MISMATCH_REQUEST_RESPONSE / support = 0.1815
+   vPAS-Failure / support = 0.1755
+   PROCESS_STATE / support = 0.291
+   IP_NOT_REACHABLE / support = 0.351
+   DIAMETER_PEER_GROUP_DOWN_GX / support = 0.1405
+FREQUENT_SETS(size=2)
+   PAD-Failure PROCESS_STATE / support = 0.1445
+   DIAMETER_PEER_GROUP_UP_TX POM-Failure / support = 0.1475
+   MISMATCH_REQUEST_RESPONSE PAD-Failure / support = 0.1525
+   ...
+```

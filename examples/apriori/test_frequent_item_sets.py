@@ -19,5 +19,5 @@ def test_frequent_sets(user_name = '', password = ''):
     for rulesk in result.aggregations.random_sample.frequent_sets.value:
         print('FREQUENT_SETS(size=' + str(size) + ')')
         for key,support in rulesk.to_dict().items():
-            print('  ', key, 'support', support)
+            print('  ', key, '/ support =', support)
         size = size + 1
