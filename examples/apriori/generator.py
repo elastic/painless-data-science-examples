@@ -95,9 +95,9 @@ def report_progress(counter, number_docs, last_progress):
         last_progress = last_progress + 0.05
     return counter + 1, last_progress
 
-def generate_and_index_events(user_name, password, number = 35000):
+def generate_and_index_data(user_name = '', password = '', number = 35000):
 
-    if user_name and password:
+    if user_name != '' and password != '':
         es = Elasticsearch(http_auth=(user_name, password))
     else:
         es = Elasticsearch()

@@ -2,11 +2,11 @@ from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search
 import utils.read_scripted_metric as read_scripted_metric
 
-def test_frequent_sets(user_name, password):
+def test_frequent_sets(user_name = '', password = ''):
     # Test that the sccripted metric produces similar results to the python implementation.
     # The results are not identical because of the random sampling.
 
-    if user_name and password:
+    if user_name != '' and password != '':
         es = Elasticsearch(http_auth=(user_name, password))
     else:
         es = Elasticsearch()
