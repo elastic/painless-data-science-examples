@@ -22,6 +22,9 @@
             "map_script": """
               def key = [];
               for (field in params["fields"]) {
+                // In a scripted metric aggregation each document is provided as a doc
+                // variable to the map_script. One can check for the existence of fields
+                // in doc as follows.
                 if (doc[field].size() > 0) {
                     key.add(doc[field].getValue());
                 }
@@ -95,12 +98,12 @@
                       continue;
                     }
 
-                    def extenedFrequentSetItems = new ArrayList(frequentSetItems);
-                    extenedFrequentSetItems.add(item.getKey());
-                    Collections.sort(extenedFrequentSetItems);
+                    def extendedFrequentSetItems = new ArrayList(frequentSetItems);
+                    extendedFrequentSetItems.add(item.getKey());
+                    Collections.sort(extendedFrequentSetItems);
                     int support = 0;
                     for (unique in uniqueItemSets) {
-                      if (unique[0].containsAll(extenedFrequentSetItems)) {
+                      if (unique[0].containsAll(extendedFrequentSetItems)) {
                         support = support + unique[1];
                       }
                       // unique[2] is the sum of all remaining unique item set counts and
@@ -111,7 +114,7 @@
                     }
                     if (support > params["min_support"] * totalCount) {
                       def flatExtendedRule = new StringJoiner(" ");
-                      for (ruleItem in extenedFrequentSetItems) {
+                      for (ruleItem in extendedFrequentSetItems) {
                         flatExtendedRule.add(ruleItem);
                       }
                       frequentSetsKPlus1.put(flatExtendedRule.toString(), ((double)support) / totalCount);
