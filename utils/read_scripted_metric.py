@@ -8,11 +8,19 @@ def recursive_find_and_replace(json, placeholder, replace):
             recursive_find_and_replace(json[key], placeholder, replace)
 
 def read(file_name):
-    # We need special handling of triple quoted strings which are not supported in the
-    # JSON reader. These just need to be copied as strings into the request body for
-    # the aggregation.
+    # We need special handling of triple quoted strings for script bodies which are
+    # not supported in the JSON reader. These just need to be copied as strings into
+    # the request body for the aggregation. We also drop painless drop comments which
+    # are prefixed by //.
 
-    scripted_metric = open(file_name, 'r').read()
+    scripted_metric = ''
+    with open(file_name, 'r') as file:
+        for line in file.readlines():
+            comment = line.find('//')
+            if comment != -1:
+                scripted_metric += line[:comment]
+            else:
+                scripted_metric += line
 
     split_scripted_metric = scripted_metric.split('"""')
 

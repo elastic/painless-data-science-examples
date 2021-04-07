@@ -69,7 +69,9 @@
                 for (rule in frequentSets[k].entrySet()) {
                   def tokenizer = new StringTokenizer(rule.getKey(), " ");
                   def frequentSetItems = Collections.list(tokenizer);
-                  for (item in uniqueItems.entrySet()) {
+                  // By the downward closure lemma we need only consider extending the set
+                  // with items which individually have sufficient support.
+                  for (item in frequentSets[0].entrySet()) {
                     if (frequentSetItems.contains(item.getKey())) {
                       continue;
                     }
