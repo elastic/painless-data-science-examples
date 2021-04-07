@@ -36,52 +36,77 @@
             """,
             "combine_script": "return state",
             "reduce_script": """
-              def reducedUniques = new HashMap();
+              def reducedState = new HashMap();
+              // In a scripted metric aggregation the states variable is a list of the
+              // objects returned by the combine_script from each shard.
               for (state in states) {
                 for (items in state.uniques.entrySet()) {
-                  int count = reducedUniques.getOrDefault(items.getKey(), 0);
-                  def itemSet = new HashSet();
-                  def tokenizer = new StringTokenizer(items.getKey(), " ");
-                  while (tokenizer.hasMoreElements()) {
-                    itemSet.add(tokenizer.nextToken());
-                  }
-                  reducedUniques.put(items.getKey(), [itemSet, count + items.getValue()]);
+                  int count = reducedState.getOrDefault(items.getKey(), 0);
+                  reducedState.put(items.getKey(), count + items.getValue());
                 }
               }
-              def uniqueItems = new HashMap();
+
+              def uniqueItemSets = [];
+              for (items in reducedState.entrySet()) {
+                def itemSet = new HashSet();
+                def tokenizer = new StringTokenizer(items.getKey(), " ");
+                while (tokenizer.hasMoreElements()) {
+                  itemSet.add(tokenizer.nextToken());
+                }
+                uniqueItemSets.add([itemSet, items.getValue()]);
+              }
+
+              // If you can convert a list item to an ordinal it is possible to sort the list
+              // using a Java lambda to perform this conversion. Here, we sort in decending
+              // order of count so we can break out of the inner loop below by testing an upper
+              // bound for the support.
+              def countOrder = Comparator.comparing(set -> set[1]);
+              uniqueItemSets.sort(countOrder.reversed());
+
               int totalCount = 0;
-              for (unique in reducedUniques.entrySet()) {
-                def items = Collections.list(new StringTokenizer(unique.getKey(), " "));
-                for (item in items) {
+              def uniqueItems = new HashMap();
+              for (int i = uniqueItemSets.size(); i-- > 0; ) {
+                uniqueItemSets[i].add(totalCount);
+                for (item in uniqueItemSets[i][0]) {
                   int count = uniqueItems.getOrDefault(item, 0);
-                  uniqueItems.put(item, count + unique.getValue()[1]);
+                  uniqueItems.put(item, count + uniqueItemSets[i][1]);
                 }
-                totalCount = totalCount + unique.getValue()[1];
+                totalCount = totalCount + uniqueItemSets[i][1];
               }
+
               def frequentSets = [new HashMap()];
               for (item in uniqueItems.entrySet()) {
                 if (item.getValue() > params["min_support"] * totalCount) {
                   frequentSets[0].put(item.getKey(), ((double)item.getValue()) / totalCount);
                 }
               }
+
               for (int k = 0; k < params["max_set_size"]; k++) {
-                def frequentSetsK = new HashMap();
+                // Build the frequent sets k + 1 by extending frequent sets of size k.
+                def frequentSetsKPlus1 = new HashMap();
                 for (rule in frequentSets[k].entrySet()) {
                   def tokenizer = new StringTokenizer(rule.getKey(), " ");
                   def frequentSetItems = Collections.list(tokenizer);
+
                   // By the downward closure lemma we need only consider extending the set
                   // with items which individually have sufficient support.
                   for (item in frequentSets[0].entrySet()) {
                     if (frequentSetItems.contains(item.getKey())) {
                       continue;
                     }
+
                     def extenedFrequentSetItems = new ArrayList(frequentSetItems);
                     extenedFrequentSetItems.add(item.getKey());
                     Collections.sort(extenedFrequentSetItems);
                     int support = 0;
-                    for (unique in reducedUniques.entrySet()) {
-                      if (unique.getValue()[0].containsAll(extenedFrequentSetItems)) {
-                        support = support + unique.getValue()[1];
+                    for (unique in uniqueItemSets) {
+                      if (unique[0].containsAll(extenedFrequentSetItems)) {
+                        support = support + unique[1];
+                      }
+                      // unique[2] is the sum of all remaining unique item set counts and
+                      // so provides an upper bound for the final support for this set.
+                      if (support + unique[2] < params["min_support"] * totalCount) {
+                        break;
                       }
                     }
                     if (support > params["min_support"] * totalCount) {
@@ -89,11 +114,11 @@
                       for (ruleItem in extenedFrequentSetItems) {
                         flatExtendedRule.add(ruleItem);
                       }
-                      frequentSetsK.put(flatExtendedRule.toString(), ((double)support) / totalCount);
+                      frequentSetsKPlus1.put(flatExtendedRule.toString(), ((double)support) / totalCount);
                     }
                   }
                 }
-                frequentSets.add(frequentSetsK);
+                frequentSets.add(frequentSetsKPlus1);
               }
               return frequentSets;
             """
