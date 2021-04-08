@@ -62,7 +62,7 @@
               // If you can convert a list item to an ordinal it is possible to sort the list
               // using a Java lambda to perform this conversion. Here, we sort in decending
               // order of count so we can break out of the inner loop below by testing an upper
-              // bound for the support.
+              // bound for the support as early as possible on average.
               def countOrder = Comparator.comparing(set -> set[1]);
               uniqueItemSets.sort(countOrder.reversed());
 
@@ -101,6 +101,20 @@
                     def extendedFrequentSetItems = new ArrayList(frequentSetItems);
                     extendedFrequentSetItems.add(item.getKey());
                     Collections.sort(extendedFrequentSetItems);
+                    def flatExtendedRuleBuilder = new StringJoiner(" ");
+                    for (ruleItem in extendedFrequentSetItems) {
+                      flatExtendedRuleBuilder.add(ruleItem);
+                    }
+                    def flatExtendedRule = flatExtendedRuleBuilder.toString();
+
+                    // For any frequent item set frequentSets[k] will contain all k subsets
+                    // of size k. Therefore, we will compute the support k times once for
+                    // each cyclic permutation, e.g. abc, bac, cab. We shortcircuit this by
+                    // checking if we already have the set.
+                    if (frequentSetsKPlus1.containsKey(flatExtendedRule)) {
+                      continue;
+                    }
+
                     int support = 0;
                     for (unique in uniqueItemSets) {
                       if (unique[0].containsAll(extendedFrequentSetItems)) {
@@ -113,11 +127,7 @@
                       }
                     }
                     if (support > params["min_support"] * totalCount) {
-                      def flatExtendedRule = new StringJoiner(" ");
-                      for (ruleItem in extendedFrequentSetItems) {
-                        flatExtendedRule.add(ruleItem);
-                      }
-                      frequentSetsKPlus1.put(flatExtendedRule.toString(), ((double)support) / totalCount);
+                      frequentSetsKPlus1.put(flatExtendedRule, ((double)support) / totalCount);
                     }
                   }
                 }
