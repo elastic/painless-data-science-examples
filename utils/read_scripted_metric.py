@@ -10,8 +10,8 @@ def recursive_find_and_replace(json, placeholder, replace):
 def read(file_name):
     # We need special handling of triple quoted strings for script bodies which are
     # not supported in the JSON reader. These just need to be copied as strings into
-    # the request body for the aggregation. We also drop painless drop comments which
-    # are prefixed by //.
+    # the request body for the aggregation. We also drop painless comments, which are
+    # prefixed by //.
 
     scripted_metric = ''
     with open(file_name, 'r') as file:
