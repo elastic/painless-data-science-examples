@@ -23,7 +23,7 @@
                 "number_buckets_in_range": 360,
                 "time_bucket_length": 60,
                 "max_beaconing_cov": 0.1,
-                "min_beaconing_autocovariance": 0.5,
+                "min_beaconing_autocovariance": 0.75,
                 "max_jitter": 0.1
             },
             "init_script": """
@@ -105,7 +105,7 @@
 
               float m = mean(a, b, 1, counts);
               float v = variance(m, a, b, 1, counts);
-              if (v < 0.1 * m) {
+              if (v < params["max_beaconing_cov"] * m) {
                 return ["beaconing": true];
               }
 
@@ -152,7 +152,7 @@
 
               float pearson = max(ac) / v;
         
-              return ["beaconing": pearson >= 0.75];
+              return ["beaconing": pearson >= params["min_beaconing_autocovariance"]];
             """
           }
         }
