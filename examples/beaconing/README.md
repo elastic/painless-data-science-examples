@@ -11,7 +11,7 @@ If the bucket length is significantly longer than the period, we expect the vari
 
 If the bucket length is significantly shorter than the period, we can actually observe the periodic pattern directly. In this case we can check for repeats which display a high autocovariance for offsets which are multiples of the period. We handle jitter directly by allowing the periodic pattern to shift slightly (by a fraction of the period) per repeat.
 
-This approach has a blind spots when:
+This approach has blind spots when:
 1. The period is close to the bucket length
 2. The window is too short to observe enough repeats
 
