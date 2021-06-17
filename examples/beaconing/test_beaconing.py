@@ -1,11 +1,8 @@
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search
 from examples.beaconing.generator import Generator
-import math
 import numpy as np
-
-# TODO
-#import utils.read_scripted_metric as read_scripted_metric
+import utils.read_scripted_metric as read_scripted_metric
 
 class Test:
 
@@ -43,8 +40,8 @@ class Test:
             "query": {
                 "range": {
                     "@timestamp": {
-                        "gte": "now-6h",
-                        "lt": "now"
+                        "gte": Generator.START_TIME,
+                        "lt":  Generator.START_TIME + 6 * 3600 * 1000
                     }
                 }
             },
@@ -69,10 +66,13 @@ class Test:
         expected_beaconing = {}
         for bucket in terms_date_histogram_result.aggregations.counts.buckets:
             tag = bucket['key']
+            print(tag)
             counts = []
             for count in bucket['time_buckets']:
                 counts.append(count['doc_count'])
             expected_beaconing[tag] = Test.__is_beaconing(counts)
+
+        print(expected_beaconing)
 
         # TODO
         #scripted_metric_query_body = read_scripted_metric.read('examples/beaconing/scripted_metric_beacons.txt')
@@ -93,16 +93,16 @@ class Test:
         # Drop zero counts at start and end and first and last partial buckets to allow
         # for signals which are intermittent.
         a,_ = next(filter(lambda x: x[1] > 0, enumerate(counts)))
+        a = a + 1
         b,_ = next(filter(lambda x: x[1] > 0, enumerate(reversed(counts))))
-        b = len(counts) - b
-        if b - a <= 2:
+        b = len(counts) - b - 1
+
+        # There are too few buckets to be confident in the test statistics.
+        if b - a < 16:
             return 0
+
         counts = counts[a+1:b-1]
-
         mean = np.mean(counts)
-        if mean == 0:
-            return False
-
         variance = np.var(counts)
 
         # For Poisson process we expect var equals the mean so this condition implies that
@@ -110,14 +110,13 @@ class Test:
         if variance < 0.1 * mean:
             return True
 
-        print(sum(1 if count == 0 else 0 for count in counts))
-        print(len(counts))
-
+        # If the frequency is too high we can't properly estimate the period.
         if 2 * sum(1 if count == 0 else 0 for count in counts) < len(counts):
             return False
 
-        # If the signal is sparse on the bucket length it's variance will be high. However,
-        # in this case we can directly check if the values arrive periodically.
+        # If the signal is sparse on the bucket length its variance will be high. However,
+        # in this case we can check if the values arrive periodically by checking the
+        # autocovariance is high.
 
         max_period = int(len(counts) / 4)
 
@@ -126,16 +125,18 @@ class Test:
         for period in range(2, max_period + 1):
 
             # Allow for jitter <= 10% of period.
-            max_jitter = int(0.1 * period)
+            jitter = int(0.1 * period)
 
             n = 0
-            for i in range(0, len(counts) - 2 * period - max_jitter + 1, period):
+            for i in range(0, len(counts) - 2 * period - jitter + 1, period):
 
-                autocovariances_i = []
+                autocovariances_i = [0] * (2 * jitter + 1)
 
-                for j in range(-max_jitter, max_jitter + 1):
+                for j in range(-jitter, jitter + 1):
                     for k in range(i, i + period):
-                        autocovariances_i.append((counts[k] - mean) * (counts[k + period + j] - mean))
+                        autocovariances_i[jitter + j] = \
+                            autocovariances_i[jitter + j] + \
+                            (counts[k] - mean) * (counts[k + period + j] - mean)
 
                 autocovariances[period - 2] = autocovariances[period - 2] + max(autocovariances_i)
                 n = n + period
@@ -149,9 +150,10 @@ class Test:
         for i in range(0, len(autocovariances)):
             np.mean(autocovariances[i:len(autocovariances):i + 2])
 
-        pearson_corr = max(autocovariances) / variance
-        
-        return True if pearson_corr > 0.6 else False
+        pearson = max(autocovariances) / variance
+        print('pearson', pearson)
+
+        return pearson >= 0.75
 
     @staticmethod
     def __es_client(user_name: str = '',

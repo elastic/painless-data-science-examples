@@ -5,6 +5,8 @@ import random
 
 class Generator:
     INDEX_NAME = 'beaconing_demo'
+    # 2021-06-01 00:00:00 in epoch milliseconds
+    START_TIME = 1622505600000
 
     @staticmethod
     def recreate_index(es: Elasticsearch):
@@ -73,7 +75,7 @@ class Generator:
     def __generate_poisson_process(tag: str,
                                    mean_interval: float,
                                    number: int):
-        time = int((datetime.now() - datetime(1970,1,1)).total_seconds() * 1000 - mean_interval * number)
+        time = Generator.START_TIME
         for _ in range(number):
             yield {
                 '_index': Generator.INDEX_NAME,
@@ -87,7 +89,7 @@ class Generator:
                                                    period: float,
                                                    jitter: float,
                                                    number: int):
-        time = int((datetime.now() - datetime(1970,1,1)).total_seconds() * 1000 - period * number)
+        time = Generator.START_TIME
         for _ in range(number):
             yield {
                 '_index': Generator.INDEX_NAME,
