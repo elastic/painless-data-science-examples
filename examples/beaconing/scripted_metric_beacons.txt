@@ -53,11 +53,6 @@
                   for (; i > 0 && counts[i - 1] == 0; i--) {}
                   return i - 1;
               }
-              int zeros(int a, int b, int[] counts) {
-                  int count = 0;
-                  for (int i = a; i < b; i++) { if (counts[i] == 0) { count++; } }
-                  return count;
-              }
               float mean(int a, int b, int stride, def array) {
                   float m = 0;
                   float n = 0;
@@ -103,20 +98,19 @@
                 return ["beaconing": false];
               }
 
+              // If the period less than the bucket interval then we expect to see
+              // low variation in the count per bucket. For Poisson process we expect
+              // the variance to be equal to the mean so this condition implies that
+              // the signal is much more regular than a Poisson process.
               float m = mean(a, b, 1, counts);
               float v = variance(m, a, b, 1, counts);
               if (v < params["max_beaconing_cov"] * m) {
                 return ["beaconing": true];
               }
 
-              // If the frequency is too high we can't properly estimate the period.
-              if (2 * zeros(a, b, counts) < b - a) {
-                return ["beaconing": false];
-              }
-
-              // If the signal is sparse on the bucket length its variance will be high.
-              // However, in this case we can check if the values arrive periodically by
-              // checking the autocovariance is high.
+              // If the period is greater than the buckt interval we can check for a
+              // periodic pattern in the buckt counts. We do this by lookig for high
+              // values of the autocovariance function.
 
               int maxPeriod = (int)(counts.length / 4);
               float[] ac = new float[maxPeriod - 1];

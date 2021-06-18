@@ -105,18 +105,16 @@ class Test:
         mean = np.mean(counts)
         variance = np.var(counts)
 
-        # For Poisson process we expect var equals the mean so this condition implies that
-        # the signal is much more regular than a Poisson process.
+        # If the period less than the bucket interval then we expect to see low variation
+        # in the count per bucket. For Poisson process we expect the variance to be equal
+        # to the mean so this condition implies that the signal is much more regular than
+        # a Poisson process.
         if variance < 0.1 * mean:
             return True
 
-        # If the frequency is too high we can't properly estimate the period.
-        if 2 * sum(1 if count == 0 else 0 for count in counts) < len(counts):
-            return False
-
-        # If the signal is sparse on the bucket length its variance will be high. However,
-        # in this case we can check if the values arrive periodically by checking the
-        # autocovariance is high.
+        # If the period is greater than the buckt interval we can check for a periodic
+        # pattern in the buckt counts. We do this by lookig for high values of the
+        # autocovariance function.
 
         max_period = int(len(counts) / 4)
 
