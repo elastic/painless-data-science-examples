@@ -12,7 +12,7 @@
     "process": {
       "terms": {
         "field": "tag",
-        "size": 12
+        "size": 20
       },
       "aggs": {
         "beacon_stats": {
@@ -34,7 +34,7 @@
               int bucket = (int)((doc[params["time_field"]].value.toEpochSecond() - 
                                   params.range_start_millis) / params["time_bucket_length"]);
               if (bucket >= 0 && bucket < state.counts.length) {
-                  state.counts[bucket] = state.counts[bucket] + 1;
+                  state.counts[bucket]++;
               }
             """,
             "combine_script": "return state",
@@ -57,9 +57,8 @@
                   double m = 0;
                   double n = 0;
                   for (int i = a; i < b; i = i + stride) {
-                      double x = (double)array[i];
-                      m = m + x;
-                      n = n + 1;
+                      m += (double)array[i];
+                      n += 1;
                   }
                   return m / n;
               }
@@ -68,8 +67,8 @@
                   double n = 0;
                   for (int i = a; i < b; i = i + stride) {
                       double x = (double)array[i];
-                      v = v + (x - mean) * (x - mean);
-                      n = n + 1;
+                      v += (x - mean) * (x - mean);
+                      n += 1;
                   }
                   return v / n;
               }
@@ -86,7 +85,7 @@
               // objects returned by the combine_script from each shard.
               for (state in states) {
                 for (int i = 0; i < counts.length; i++) {
-                  counts[i] = counts[i] + state.counts[i];
+                  counts[i] += state.counts[i];
                 }
               }
 
@@ -104,7 +103,7 @@
               // the signal is much more regular than a Poisson process.
               double m = mean(a, b, 1, counts);
               double v = variance(m, a, b, 1, counts);
-              if (v < params["max_beaconing_cov"] * m) {
+              if (v < params["max_beaconing_cov"] * Math.abs(m)) {
                 return ["is_beaconing": true,
                         "non_empty_buckets": b - a,
                         "mean": m,
@@ -115,7 +114,7 @@
               // periodic pattern in the buckt counts. We do this by lookig for high
               // values of the autocovariance function.
 
-              int maxPeriod = (int)(counts.length / 4);
+              int maxPeriod = (int)((b - a) / 4);
               double[] ac = new double[maxPeriod - 1];
 
               for (int period = 2; period <= maxPeriod; period++) {
@@ -124,16 +123,15 @@
                 int jitter = (int)(0.1 * period);
 
                 int n = 0;
-                for (int i = a; i < b - 2 * period - jitter + 1; i = i + period) {
+                for (int i = a; i < b - 2 * period - jitter + 1; i += period) {
                     double[] aci = new double[2 * jitter + 1];
                     for (int j = -jitter; j <= jitter; j++) {
                         for (int k = i; k < i + period; k++) {
-                            aci[jitter + j] = aci[jitter + j] +
-                                              (counts[k] - m) * (counts[k + period + j] - m);
+                            aci[jitter + j] += (counts[k] - m) * (counts[k + period + j] - m);
                         }
                     }
-                    ac[period - 2] = ac[period - 2] + max(aci);
-                    n = n + period;
+                    ac[period - 2] += max(aci);
+                    n += period;
                 }
                 ac[period - 2] = ac[period - 2] / n;
               }
