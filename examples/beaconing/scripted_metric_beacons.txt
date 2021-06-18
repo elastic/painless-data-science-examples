@@ -15,7 +15,7 @@
         "size": 12
       },
       "aggs": {
-        "is_beaconing": {
+        "beacon_stats": {
           "scripted_metric": {
             "params": {
                 "time_field": "@timestamp",
@@ -23,7 +23,7 @@
                 "number_buckets_in_range": 360,
                 "time_bucket_length": 60,
                 "max_beaconing_cov": 0.1,
-                "min_beaconing_autocovariance": 0.75,
+                "min_beaconing_autocovariance": 0.7,
                 "max_jitter": 0.1
             },
             "init_script": """
@@ -33,7 +33,7 @@
             "map_script": """
               int bucket = (int)((doc[params["time_field"]].value.toEpochSecond() - 
                                   params.range_start_millis) / params["time_bucket_length"]);
-              if (bucket > 0 && bucket < state.counts.length) {
+              if (bucket >= 0 && bucket < state.counts.length) {
                   state.counts[bucket] = state.counts[bucket] + 1;
               }
             """,
@@ -53,28 +53,28 @@
                   for (; i > 0 && counts[i - 1] == 0; i--) {}
                   return i - 1;
               }
-              float mean(int a, int b, int stride, def array) {
-                  float m = 0;
-                  float n = 0;
+              double mean(int a, int b, int stride, def array) {
+                  double m = 0;
+                  double n = 0;
                   for (int i = a; i < b; i = i + stride) {
-                      float x = (float)array[i];
-                      m = (n * m + x) / (n + 1);
+                      double x = (double)array[i];
+                      m = m + x;
                       n = n + 1;
                   }
-                  return m;
+                  return m / n;
               }
-              float variance(float mean, int a, int b, int stride, def array) {
-                  float v = 0;
-                  float n = 0;
+              double variance(double mean, int a, int b, int stride, def array) {
+                  double v = 0;
+                  double n = 0;
                   for (int i = a; i < b; i = i + stride) {
-                      float x = (float)array[i];
-                      v = (n * v + (x - mean) * (x - mean)) / (n + 1);
+                      double x = (double)array[i];
+                      v = v + (x - mean) * (x - mean);
                       n = n + 1;
                   }
-                  return v;
+                  return v / n;
               }
-              float max(def array) {
-                  float max = array[0];
+              double max(def array) {
+                  double max = array[0];
                   for (int i = 1; i < array.length; i++) { if (array[i] > max) { max = array[i]; }}
                   return max;
               }
@@ -95,17 +95,20 @@
 
               // There are too few buckets to be confident in the test statistics.
               if (b - a < 16) {
-                return ["beaconing": false];
+                return ["is_beaconing": false, "non_empty_buckets": b - a];
               }
 
               // If the period less than the bucket interval then we expect to see
               // low variation in the count per bucket. For Poisson process we expect
               // the variance to be equal to the mean so this condition implies that
               // the signal is much more regular than a Poisson process.
-              float m = mean(a, b, 1, counts);
-              float v = variance(m, a, b, 1, counts);
+              double m = mean(a, b, 1, counts);
+              double v = variance(m, a, b, 1, counts);
               if (v < params["max_beaconing_cov"] * m) {
-                return ["beaconing": true];
+                return ["is_beaconing": true,
+                        "non_empty_buckets": b - a,
+                        "mean": m,
+                        "variance": v];
               }
 
               // If the period is greater than the buckt interval we can check for a
@@ -113,7 +116,7 @@
               // values of the autocovariance function.
 
               int maxPeriod = (int)(counts.length / 4);
-              float[] ac = new float[maxPeriod - 1];
+              double[] ac = new double[maxPeriod - 1];
 
               for (int period = 2; period <= maxPeriod; period++) {
 
@@ -122,7 +125,7 @@
 
                 int n = 0;
                 for (int i = a; i < b - 2 * period - jitter + 1; i = i + period) {
-                    float[] aci = new float[2 * jitter + 1];
+                    double[] aci = new double[2 * jitter + 1];
                     for (int j = -jitter; j <= jitter; j++) {
                         for (int k = i; k < i + period; k++) {
                             aci[jitter + j] = aci[jitter + j] +
@@ -144,9 +147,13 @@
                   ac[i] = mean(i, ac.length, i + 2, ac);
               }
 
-              float pearson = max(ac) / v;
+              double pearson = Math.min(max(ac) / v, 1.0);
         
-              return ["beaconing": pearson >= params["min_beaconing_autocovariance"]];
+              return ["is_beaconing": pearson >= params["min_beaconing_autocovariance"],
+                      "non_empty_buckets": b - a,
+                      "pearson": pearson,
+                      "mean": m,
+                      "variance": v];
             """
           }
         }
