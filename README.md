@@ -17,15 +17,15 @@ Install the required dependencies
 ```
 pip3 install -r requirements.txt
 ```
-Once you start an Elasticsearch instance, then each example includes a `generate` module which can be used to generate the demo data as, for example:
+Once you start an Elasticsearch instance, then each example includes code to generate some sample data. This is typically done using the `Demo` object from the demo module, for example:
 ```
->>> import examples.apriori.generator as generator
->>> generator.generate_and_index_data(user_name='my_user', password='my_password')
+>>> from examples.apriori.demo import Demo
+>>> demo = Demo(user_name='my_user', password='my_password')
+>>> demo.setup()
 ```
-where 'my_user' and 'my_password' are the user name and password for the Elasticsearch instance you've started. Each example also includes a `demo` module which can be run to see the output of the example as, for example:
+where 'my_user' and 'my_password' are the user name and password for the Elasticsearch instance you've started. The `Demo` object also allows you to run the aggregation using the Elasticsearch Python to see the result on the demo data set, for example:
 ```
->>> import examples.apriori.demo as demo
->>> demo.run(user_name='my_user', password='my_password')
+>>> demo.run()
 ```
 For the apriori example you should see output like:
 ```
@@ -52,4 +52,17 @@ FREQUENT_SETS(size=2)
    DIAMETER_PEER_GROUP_UP_TX POM-Failure / support = 0.1475
    MISMATCH_REQUEST_RESPONSE PAD-Failure / support = 0.1525
    ...
+```
+Each example directory also includes the scripted metric request in a text file, for example [examples/apriori/scripted_metric_frequent_sets.txt](https://github.com/elastic/painless-data-science-examples/blob/master/examples/apriori/scripted_metric_frequent_sets.txt). This can be pasted also be pasted and run kibana dev console as follows:
+```
+GET apriori_demo/_search
+{
+  "size": 0,
+  "query": {
+    "function_score": {
+      "random_score": {}
+    }
+  },
+  ...
+}
 ```

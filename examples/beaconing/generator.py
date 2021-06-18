@@ -31,7 +31,7 @@ class Generator:
 
     def recreate_index(self):
         '''
-        Recreate the index containing the test data.
+        Recreate the index containing the demo data.
         '''
         mappings = {
             'mappings': {
