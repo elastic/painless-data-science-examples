@@ -21,9 +21,10 @@ class Generator:
         Generate and index some demo data.
         '''
         self.recreate_index()
-        self.generate_and_index_beacon('beacon_1m', 60000, 0.01)
-        self.generate_and_index_beacon('beacon_5m', 300000, 0.05)
-        self.generate_and_index_beacon('beacon_10m', 600000, 0.05)
+        self.generate_and_index_beacon('beacon_1m', [60000], 0.01)
+        self.generate_and_index_beacon('beacon_5m', [300000], 0.05)
+        self.generate_and_index_beacon('beacon_10m', [600000], 0.05)
+        self.generate_and_index_beacon('beacon_irregular', [300000, 180000], 0.01)
         for i in range(1, 5):
             self.generate_and_index_poisson_process('poisson_' + str(i), 300000)
         for i in range(5, 10):
@@ -50,7 +51,7 @@ class Generator:
 
     def generate_and_index_beacon(self,
                                   tag: str,
-                                  period: int,
+                                  period: list[int],
                                   jitter: float,
                                   number: int = 1000,
                                   report_progress: bool = False):
@@ -106,9 +107,10 @@ class Generator:
 
     def __periodic_with_jitter_generator(self,
                                          tag: str,
-                                         period: float,
+                                         period: list[int],
                                          jitter: float,
                                          number: int):
+        i = 0
         time = Generator.START_TIME
         for _ in range(number):
             yield {
@@ -116,7 +118,8 @@ class Generator:
                 'tag': tag,
                 '@timestamp': time
             }
-            time = time + int(period + random.uniform(-jitter, jitter) * period + 0.5)
+            time = time + int(period[i] + random.uniform(-jitter, jitter) * period[i] + 0.5)
+            i = (i + 1) % len(period)
 
     def __report_progress(self,
                           counter: int,
